@@ -1,0 +1,20 @@
+html, body, #root {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+
+.markdown table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.markdown th, .markdown td {
+  border: 1px solid #bfbfc0;
+  padding: 0.5rem;
+  text-align: left;
+}
+
+.markdown th {
+  background-color: #898989;
+}
