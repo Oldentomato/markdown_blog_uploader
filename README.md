@@ -23,9 +23,6 @@ services:
       - "80:80"
     depends_on:
       - server
-    environment:
-      - VITE_SERVER_API_BASE_URL=set_ur_url
-      - VITE_STORAGE_KEY=storage_key
 
   server:
     build: ./back

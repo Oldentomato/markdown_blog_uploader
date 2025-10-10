@@ -13,8 +13,8 @@ const { Header, Content } = Layout;
 const { TextArea } = Input;
 const { Title } = Typography;
 
-const serverUrl = import.meta.env.VITE_SERVER_API_BASE_URL;
-const STORAGE_KEY = import.meta.env.VITE_STORAGE_KEY;
+const serverUrl = "http://server.mark-uploader.kro.kr/";
+const STORAGE_KEY = "markdown-content";
 const EXPIRY_MS = 1000 * 60 * 30; // 30분 유지
 
 export default function App() {
