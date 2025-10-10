@@ -23,6 +23,9 @@ services:
       - "80:80"
     depends_on:
       - server
+    environment:
+      - VITE_SERVER_API_BASE_URL=set_ur_url
+      - VITE_STORAGE_KEY=storage_key
 
   server:
     build: ./back
@@ -32,6 +35,13 @@ services:
     environment:
       - GITHUB_PAT=your_github_token
 
+```
+- modify nginx.conf
+```conf
+  ...
+  location /api/ {
+    proxy_pass http://your_server_url/; 
+  }
 ```
 
 - Visit http://localhost:5173 in your browser.
