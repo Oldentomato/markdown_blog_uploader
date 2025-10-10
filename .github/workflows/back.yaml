@@ -31,6 +31,7 @@ jobs:
         run: echo "tag=$(cat ./back/VERSION)" >> $GITHUB_OUTPUT
 
       - name: Build Docker image
+        working-directory: ./back
         run: |
           docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/post-express:${{ steps.version.outputs.tag }} .
 

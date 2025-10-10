@@ -32,6 +32,7 @@ jobs:
         run: echo "tag=$(cat ./front/VERSION)" >> $GITHUB_OUTPUT
 
       - name: Build Docker image
+        working-directory: ./front
         run: |
           docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/post-react:${{ steps.version.outputs.tag }} .
 
