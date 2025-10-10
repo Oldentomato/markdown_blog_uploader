@@ -65,7 +65,7 @@ jobs:
         run: |
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git config --global user.name "github-actions[bot]"
-          git add values.yaml
+          git add ./post_blog/front/values.yaml
           git commit -m "ci: update backend image tag to $IMAGE_TAG" || echo "No changes to commit"
 
       - name: Push commit
