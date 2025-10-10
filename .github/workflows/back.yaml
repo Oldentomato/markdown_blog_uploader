@@ -28,7 +28,7 @@ jobs:
 
       - name: Read version
         id: version
-        run: echo "tag=$(cat VERSION)" >> $GITHUB_OUTPUT
+        run: echo "tag=$(cat ./back/VERSION)" >> $GITHUB_OUTPUT
 
       - name: Build Docker image
         run: |
