@@ -36,7 +36,7 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
-const TEST_TOKEN = process.env.GITHUB_PAT;
+const TEST_TOKEN = process.env.GITHUB_PAT.trim();;
 
 
 app.post("/api/upload", async (req, res) => {
