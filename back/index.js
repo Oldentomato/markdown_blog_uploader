@@ -44,8 +44,9 @@ app.post("/api/upload", async (req, res) => {
       const { filePath, imagePath, repoName, content, message } = req.body;
   
       // oauth2-proxy가 전달한 GitHub access token (테스트 시 fallback 가능)
-      const token =
-        req.headers["authorization"]?.replace("Bearer ", "") || TEST_TOKEN;
+      // const token =
+      //   req.headers["authorization"]?.replace("Bearer ", "") || TEST_TOKEN;
+      const token = TEST_TOKEN;
       if (!token) {
         return res.status(401).json({ error: "GitHub access token 없음" });
       }
