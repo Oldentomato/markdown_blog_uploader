@@ -13,7 +13,7 @@ const { Header, Content } = Layout;
 const { TextArea } = Input;
 const { Title } = Typography;
 
-const serverUrl = "https://server.mark-uploader.kro.kr";
+const serverUrl = "http://server.mark-uploader.kro.kr";
 const STORAGE_KEY = "markdown-content";
 const EXPIRY_MS = 1000 * 60 * 30; // 30분 유지
 
