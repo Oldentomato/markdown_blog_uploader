@@ -74,6 +74,32 @@ const checkContentValid = (markdown) => {
   return { valid: true, message: "검증 통과", title: data.title };
 };
 
+const onModifyGithub = async (markdown, repoName, repoPath, title, message, fileSha) => {
+  try {
+    const res = await fetch("/api/modify", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        filePath: repoPath+`/${title}.md`,
+        repoName: repoName,
+        content: markdown,
+        message: message,
+        sha: fileSha
+      }),
+    });
+
+    const data = await res.json();
+    if (res.ok) {
+      alert("업로드 성공! 커밋 SHA: " + data.data.commit.sha);
+    } else {
+      alert("업로드 실패: " + JSON.stringify(data));
+    }
+  } catch (err) {
+    console.error(err);
+    alert("에러 발생: " + err.message);
+  }
+}
+
 const onPushGithub = async (markdown, repoName, repoPath, imagePath, title, message = "upload new markdown file via webapp") => {
   try {
     const res = await fetch("/api/upload", {
@@ -100,4 +126,4 @@ const onPushGithub = async (markdown, repoName, repoPath, imagePath, title, mess
   }
 };
 
-export { checkContentValid, onPushGithub };
+export { checkContentValid, onPushGithub, onModifyGithub };

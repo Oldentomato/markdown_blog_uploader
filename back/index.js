@@ -36,6 +36,59 @@ const upload = multer({ storage });
 
 const TEST_TOKEN = process.env.GITHUB_PAT.trim();;
 
+app.post("/api/modify", async(req, res) => {
+  try {
+    const { filePath, repoName, content, message, sha } = req.body;
+
+    // oauth2-proxy가 전달한 GitHub access token (테스트 시 fallback 가능)
+    // const token =
+    //   req.headers["authorization"]?.replace("Bearer ", "") || TEST_TOKEN;
+    const token = TEST_TOKEN;
+    if (!token) {
+      return res.status(401).json({ error: "GitHub access token 없음" });
+    }
+
+    // 1. owner 가져오기
+    const userRes = await fetch("https://api.github.com/user", {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/vnd.github+json",
+      },
+    });
+    const user = await userRes.json();
+    const owner = user.login;
+
+    // 6. 최종 Markdown push
+    const encodedContent = Buffer.from(content).toString("base64");
+
+    const githubRes = await fetch(
+      `https://api.github.com/repos/${owner}/${repoName}/contents/${filePath}`,
+      {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+          Accept: "application/vnd.github+json",
+        },
+        body: JSON.stringify({
+          message: message || "upload via webapp",
+          content: encodedContent,
+          sha: sha
+        }),
+      }
+    );
+
+    const data = await githubRes.json();
+    if (!githubRes.ok) {
+      return res.status(githubRes.status).json(data);
+    }
+
+    res.json({ success: true, data });
+  } catch (err) {
+    console.error("Upload failed:", err);
+    res.status(500).json({ error: "Upload failed" });
+  }
+})
 
 app.post("/api/upload", async (req, res) => {
     try {

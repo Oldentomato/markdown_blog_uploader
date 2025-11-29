@@ -1,26 +1,40 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Layout, Input, Button, Space, Typography, ConfigProvider, theme, Switch, Modal, InputNumber, Upload } from "antd";
+import { Layout, Input, Button, Space, Typography, ConfigProvider, theme, Switch, Modal, InputNumber, Upload, Form } from "antd";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { imageForm, quoteForm, linkForm, codeForm, codeDiffForm } from "./util/mdTemplate";
-import { checkContentValid, onPushGithub } from "./components/mdCheck";
+import { checkContentValid, onPushGithub, onModifyGithub } from "./components/mdCheck";
 import { UploadOutlined } from "@ant-design/icons";
 
 const { Header, Content } = Layout;
 const { TextArea } = Input;
 const { Title } = Typography;
 
-const serverUrl = "http://server.mark-uploader.kro.kr";
-const STORAGE_KEY = "markdown-content";
+let serverUrl
+let STORAGE_KEY
+
+
+if (import.meta.env.PROD) {
+  serverUrl = process.env.SERVER_API_BASE_URL;
+  STORAGE_KEY = process.env.STORAGE_KEY;
+}else{
+  serverUrl = import.meta.env.VITE_SERVER_API_BASE_URL;
+  STORAGE_KEY = import.meta.env.VITE_STORAGE_KEY;
+}
+
 const EXPIRY_MS = 1000 * 60 * 30; // 30분 유지
 
 export default function App() {
   const [markdown, setMarkdown] = useState("## Table of contents");
   const [darkMode, setDarkMode] = useState(true);
   const [isUpload, setIsUpload] = useState(false);
+  const [fileSha, setFileSha] = useState(null);
+  const [isOpenGithub, setIsOpenGithub] = useState(false);
+  const [githubUrl, setGithubUrl] = useState("");
+  const [githubLoading, setGithubLoading] = useState(false);
   const [repoModalVisible, setRepoModalVisible] = useState(false);
   const [repoName, setRepoName] = useState("astro-paper");
   const [repoPath, setRepoPath] = useState("src/data/blog");
@@ -64,6 +78,29 @@ export default function App() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   }, [markdown]);
 
+  const base64ToUtf8 = (base64) => {
+    const bytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
+    const decoder = new TextDecoder('utf-8');
+    return decoder.decode(bytes);
+  }
+
+  const convertGithubUrlToApi = (url) => {
+    try {
+      // 예: https://github.com/user/repo/blob/branch/docs/test.md
+      const parts = new URL(url).pathname.split("/");
+  
+      // ["", "user", "repo", "blob", "branch", "docs", "test.md"]
+      const user = parts[1];
+      const repo = parts[2];
+      const branch = parts[4];
+      const path = parts.slice(5).join("/");
+  
+      return `https://api.github.com/repos/${user}/${repo}/contents/${path}?ref=${branch}`;
+    } catch {
+      return null;
+    }
+  };
+
 
   const generateTableMarkdown = (cols) => {
     const headers = Array(cols).fill("헤더").map((h, i) => `${h}${i+1}`).join(" | ");
@@ -102,11 +139,51 @@ export default function App() {
       if(repoName === "" || repoPath === ""){
         alert("repo 정보를 입력하십시오")
       }else{
-        await onPushGithub(markdown, repoName, repoPath, imagePath, result.title.replaceAll(" ", "_"))
+        if(fileSha === null){
+          await onPushGithub(markdown, repoName, repoPath, imagePath, result.title.replaceAll(" ", "_"), "upload new markdown file via webapp")
+        }else{
+          await onModifyGithub(markdown, repoName, repoPath, result.title.replaceAll(" ", "_"), "modify markdown file via webapp", fileSha)
+        }
+        
       }
     }
+    setMarkdown("## Table of contents")
     setIsUpload(false)
   }
+
+  const fetchMarkdown = async () => {
+    setGithubLoading(true);
+  
+    // 1) 사용자가 입력한 URL → API URL 로 변환
+    const apiUrl = convertGithubUrlToApi(githubUrl);
+  
+    if (!apiUrl) {
+      message.error("유효한 GitHub 파일 URL을 입력하세요.");
+      setGithubLoading(false);
+      return;
+    }
+  
+    try {
+      // 2) raw 대신 API 호출해야 sha 를 얻을 수 있음
+      const res = await fetch(apiUrl);
+      if (!res.ok) throw new Error("파일을 불러올 수 없습니다.");
+  
+      const json = await res.json();
+
+       // base64 → UTF-8 md 변환
+      const md = base64ToUtf8(json.content);
+  
+  
+      setMarkdown(md);
+      setFileSha(json.sha);   // ← sha 정상 획득!
+      setIsOpenGithub(false);
+  
+    } catch (err) {
+      message.error("Markdown 파일을 가져오는데 실패했습니다.");
+    } finally {
+      setGithubLoading(false);
+    }
+  };
 
   const uploadProps = {
     name: "file",
@@ -245,60 +322,93 @@ return (
         onCancel={() => setIsFrontmatterModalOpen(false)}
       >
         <Space direction="vertical" style={{ width: "100%" }}>
-          <Input
-            placeholder="author"
-            value={frontmatter.author}
-            onChange={(e) => setFrontmatter({ ...frontmatter, author: e.target.value })}
-          />
-          <Space>
+        <Form layout="horizontal" style={{ width: "100%" }}>
+          <Form.Item label="author">
             <Input
-              placeholder="pubDatetime"
-              value={frontmatter.pubDatetime}
-              onChange={(e) => setFrontmatter({ ...frontmatter, pubDatetime: e.target.value })}
+              value={frontmatter.author}
+              onChange={(e) => setFrontmatter({ ...frontmatter, author: e.target.value })}
             />
-            <Button onClick={() => insertToday("pubDatetime")}>오늘날짜</Button>
-          </Space>
-          <Space>
+          </Form.Item>
+
+          <Form.Item label="pubDatetime">
+            <Space>
+              <Input
+                value={frontmatter.pubDatetime}
+                onChange={(e) => setFrontmatter({ ...frontmatter, pubDatetime: e.target.value })}
+              />
+              <Button onClick={() => insertToday("pubDatetime")}>오늘날짜</Button>
+            </Space>
+          </Form.Item>
+
+          <Form.Item label="modDatetime">
+            <Space>
+              <Input
+                value={frontmatter.modDatetime}
+                onChange={(e) => setFrontmatter({ ...frontmatter, modDatetime: e.target.value })}
+              />
+              <Button onClick={() => insertToday("modDatetime")}>오늘날짜</Button>
+            </Space>
+          </Form.Item>
+
+          <Form.Item label="title">
             <Input
-              placeholder="modDatetime"
-              value={frontmatter.modDatetime}
-              onChange={(e) => setFrontmatter({ ...frontmatter, modDatetime: e.target.value })}
+              value={frontmatter.title}
+              onChange={(e) => setFrontmatter({ ...frontmatter, title: e.target.value })}
             />
-            <Button onClick={() => insertToday("modDatetime")}>오늘날짜</Button>
-          </Space>
-          <Input
-            placeholder="title"
-            value={frontmatter.title}
-            onChange={(e) => setFrontmatter({ ...frontmatter, title: e.target.value })}
-          />
-          <Input
-            placeholder="slug"
-            value={frontmatter.slug}
-            onChange={(e) => setFrontmatter({ ...frontmatter, slug: e.target.value })}
-          />
-          <Input
-            placeholder="featured (true/false)"
-            value={frontmatter.featured}
-            onChange={(e) => setFrontmatter({ ...frontmatter, featured: e.target.value })}
-          />
-          <Input
-            placeholder="draft (true/false)"
-            value={frontmatter.draft}
-            onChange={(e) => setFrontmatter({ ...frontmatter, draft: e.target.value })}
-          />
-          <Input
-            placeholder="tags (쉼표 구분)"
-            value={frontmatter.tags}
-            onChange={(e) => setFrontmatter({ ...frontmatter, tags: e.target.value })}
-          />
-          <Input.TextArea
-            rows={3}
-            placeholder="description"
-            value={frontmatter.description}
-            autoSize={{ minRows: 3, maxRows: 10 }}
-            onChange={(e) => setFrontmatter({ ...frontmatter, description: e.target.value })}
-          />
+          </Form.Item>
+
+          <Form.Item label="slug">
+            <Input
+              value={frontmatter.slug}
+              onChange={(e) => setFrontmatter({ ...frontmatter, slug: e.target.value })}
+            />
+          </Form.Item>
+
+          <Form.Item label="featured (true/false)">
+            <Input
+              value={frontmatter.featured}
+              onChange={(e) => setFrontmatter({ ...frontmatter, featured: e.target.value })}
+            />
+          </Form.Item>
+
+          <Form.Item label="draft (true/false)">
+            <Input
+              value={frontmatter.draft}
+              onChange={(e) => setFrontmatter({ ...frontmatter, draft: e.target.value })}
+            />
+          </Form.Item>
+
+          <Form.Item label="tags (쉼표 구분)">
+            <Input
+              value={frontmatter.tags}
+              onChange={(e) => setFrontmatter({ ...frontmatter, tags: e.target.value })}
+            />
+          </Form.Item>
+
+          <Form.Item label="description">
+            <Input.TextArea
+              value={frontmatter.description}
+              autoSize={{ minRows: 3, maxRows: 10 }}
+              onChange={(e) => setFrontmatter({ ...frontmatter, description: e.target.value })}
+            />
+          </Form.Item>
+        </Form>
         </Space>
+      </Modal>
+
+      <Modal
+        title="GitHub Markdown 가져오기"
+        open={isOpenGithub}
+        onOk={fetchMarkdown}
+        onCancel={() => setIsOpenGithub(false)}
+        okText="불러오기"
+        confirmLoading={githubLoading}
+      >
+        <Input
+          placeholder="GitHub 파일 URL 입력 (예: https://github.com/user/repo/blob/main/docs/readme.md)"
+          value={githubUrl}
+          onChange={(e) => setGithubUrl(e.target.value)}
+        />
       </Modal>
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}>
@@ -402,6 +512,14 @@ return (
               <Upload style={{marginLeft: 10}} {...uploadProps}>
                 <Button icon={<UploadOutlined />}>Upload Image</Button>
               </Upload>
+              <Button style={{
+                  position: "absolute",
+                  top: 16,
+                  right: 270,
+                  zIndex: 1000,
+                }}type="primary" onClick={() => setIsOpenGithub(true)}>
+                Markdown 가져오기
+              </Button>
               <Button
                 style={{
                   position: "absolute",
